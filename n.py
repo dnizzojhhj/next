@@ -106,7 +106,7 @@ SPECIAL_KEY_PRICES = {
 # Image configuration
 START_IMAGES = [
     {
-        'url': 'https://files.catbox.moe/7vv474.bmp',
+        'url': 'https://files.catbox.moe/0s0dn0.png',
         'caption': (
             '🔥 *Welcome to the Ultimate DDoS Bot !*' + '\n\n'
             '💻 *Example:* `20.235.43.9 14533 120 100`' + '\n\n'
